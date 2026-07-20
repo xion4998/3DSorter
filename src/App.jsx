@@ -1,5 +1,23 @@
 /* eslint-disable */
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, set, onValue } from "firebase/database";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBr-Vq8kDPrxNv8RojdrPa_GUgXth2tHmg",
+  authDomain: "teamnight-d909b.firebaseapp.com",
+  databaseURL: "https://teamnight-d909b-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "teamnight-d909b",
+  storageBucket: "teamnight-d909b.firebasestorage.app",
+  messagingSenderId: "440378727824",
+  appId: "1:440378727824:web:2c4bf51c6c57f8f7d96715"
+};
+
+let fdb = null;
+try { fdb = getDatabase(initializeApp(firebaseConfig)); } catch (e) {}
+const dbSet = (p, val) => { try { if (fdb) set(ref(fdb, p), val); } catch (e) {} };
+
+const EDIT_PASSWORD = "008"; // 수정 비밀번호
 
 const ZONES = ["상부", "하부", "B", "C", "D", "P", "T", "W", "Z"];
 const ZONE_COLORS = {
@@ -49,6 +67,27 @@ export default function App() {
   const [activeMachine, setActiveMachine] = useState(1);
   const [activeBatch, setActiveBatch] = useState(1);
   const [copied, setCopied] = useState(false);
+  const [editable, setEditable] = useState(() => {
+    try { return localStorage.getItem("sorter3d_editable") === "true"; } catch (e) { return false; }
+  });
+  const [showPwInput, setShowPwInput] = useState(false);
+  const [pwValue, setPwValue] = useState("");
+
+  const tryUnlock = () => {
+    if (pwValue === EDIT_PASSWORD) {
+      setEditable(true);
+      try { localStorage.setItem("sorter3d_editable", "true"); } catch (e) {}
+      setShowPwInput(false); setPwValue("");
+    } else {
+      setPwValue("");
+    }
+  };
+
+  const lockEdit = () => {
+    setEditable(false);
+    try { localStorage.setItem("sorter3d_editable", "false"); } catch (e) {}
+  };
+
   const [resetConfirm, setResetConfirm] = useState(false);
   const [enabledMachines, setEnabledMachines] = useState(() => {
     try { const s = localStorage.getItem("sorter3d_enabled"); if (s) return JSON.parse(s); } catch (e) {}
@@ -56,8 +95,8 @@ export default function App() {
   });
   const inputPanelRef = useRef(null);
 
-  const saveData = (d) => { setData(d); try { localStorage.setItem("sorter3d_data", JSON.stringify(d)); } catch (e) {} };
-  const saveTotals = (t) => { setTotals(t); try { localStorage.setItem("sorter3d_totals", JSON.stringify(t)); } catch (e) {} };
+  const saveData = (d) => { if (!editable) return; setData(d); try { localStorage.setItem("sorter3d_data", JSON.stringify(d)); } catch (e) {} dbSet("sorter3d/data", d); };
+  const saveTotals = (t) => { if (!editable) return; setTotals(t); try { localStorage.setItem("sorter3d_totals", JSON.stringify(t)); } catch (e) {} dbSet("sorter3d/totals", t); };
 
   const toggleMachineEnabled = (m) => {
     const next = { ...enabledMachines, [m]: !enabledMachines[m] };
@@ -120,6 +159,25 @@ export default function App() {
     return out;
   }, [data, totals]);
 
+
+  // Firebase 실시간 구독
+  useEffect(() => {
+    if (!fdb) return;
+    const subs = [];
+    subs.push(onValue(ref(fdb, "sorter3d/data"), snap => {
+      const v = snap.val();
+      if (v) {
+        setData(v);
+        try { localStorage.setItem("sorter3d_data", JSON.stringify(v)); } catch (e) {}
+      }
+    }));
+    subs.push(onValue(ref(fdb, "sorter3d/totals"), snap => {
+      const v = snap.val();
+      if (v) { setTotals(v); setTempTotals({ 1: String(v[1]), 2: String(v[2]) }); }
+    }));
+    return () => subs.forEach(u => u());
+  }, []);
+
   const grand = useMemo(() => {
     let doneSum = 0, totalSum = 0;
     ZONES.forEach(z => MACHINES.forEach(m => {
@@ -128,6 +186,11 @@ export default function App() {
     }));
     return { pct: totalSum > 0 ? Math.round((doneSum / totalSum) * 100) : 0 };
   }, [data, totals]);
+
+  // 대시보드용 요약 실시간 전송
+  useEffect(() => {
+    dbSet("summary/3ds", { pct: grand.pct, ts: Date.now() });
+  }, [grand.pct]);
 
   const getSummaryText = () => {
     const now = new Date();
@@ -178,6 +241,28 @@ export default function App() {
       <div style={{ textAlign: "center", marginBottom: 20 }}>
         <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0, letterSpacing: "0.08em", background: "linear-gradient(135deg,#db2777,#7c3aed)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>3D Sorter</h1>
         <div style={{ fontSize: 11, letterSpacing: "0.3em", color: S.textSub, textTransform: "uppercase", marginTop: 4, fontWeight: 500 }}>피킹 진행 현황</div>
+        {/* 잠금 상태 */}
+        <div style={{ marginTop: 10 }}>
+          {editable ? (
+            <button onClick={lockEdit} style={{ fontSize: 11, fontWeight: 700, padding: "5px 16px", borderRadius: 20, cursor: "pointer", background: "#dcfce7", border: "1px solid #86efac", color: "#15803d", fontFamily: "inherit" }}>
+              🔓 수정 가능 · 탭하여 잠금
+            </button>
+          ) : showPwInput ? (
+            <div style={{ display: "flex", gap: 6, justifyContent: "center", alignItems: "center" }}>
+              <input type="password" inputMode="numeric" value={pwValue} autoFocus
+                onChange={e => setPwValue(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && tryUnlock()}
+                placeholder="비밀번호"
+                style={{ width: 100, background: "#fff", border: "1.5px solid #7c3aed", borderRadius: 10, padding: "6px 10px", fontSize: 14, fontWeight: 700, outline: "none", textAlign: "center", fontFamily: "inherit" }} />
+              <button onClick={tryUnlock} style={{ fontSize: 12, fontWeight: 800, padding: "7px 14px", borderRadius: 10, cursor: "pointer", background: "#7c3aed", border: "none", color: "#fff", fontFamily: "inherit" }}>확인</button>
+              <button onClick={() => { setShowPwInput(false); setPwValue(""); }} style={{ fontSize: 12, fontWeight: 700, padding: "7px 10px", borderRadius: 10, cursor: "pointer", background: "#f8fafc", border: "1px solid #e2e8f0", color: "#94a3b8", fontFamily: "inherit" }}>취소</button>
+            </div>
+          ) : (
+            <button onClick={() => setShowPwInput(true)} style={{ fontSize: 11, fontWeight: 700, padding: "5px 16px", borderRadius: 20, cursor: "pointer", background: "#f8fafc", border: "1px solid #e2e8f0", color: "#94a3b8", fontFamily: "inherit" }}>
+              🔒 보기 전용 · 탭하여 잠금해제
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 배치 수 설정 (호기별) */}
