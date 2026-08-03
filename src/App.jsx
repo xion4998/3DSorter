@@ -128,8 +128,9 @@ export default function App() {
   };
 
   const togglePicking = (zone) => {
-    const newPicking = !(data[zone].picking || false);
-    saveData({ ...data, [zone]: { ...data[zone], picking: newPicking, done: newPicking ? totalBatches : data[zone].done } });
+    const cur = data[zone];
+    const newPicking = !(cur.picking || false);
+    saveData({ ...data, [zone]: { ...cur, picking: newPicking, done: newPicking ? totalBatches : cur.done } });
   };
 
   const resetZone = (z, e) => {
