@@ -183,7 +183,7 @@ export default function App() {
 
   useEffect(() => {
     dbSet("summary/3ds", { pct: grand.pct, ts: Date.now() });
-  }, [grand.pct]);
+  }, [grand.pct, data]);
 
   const getSummaryText = () => {
     const now = new Date();
