@@ -53,6 +53,17 @@ const initTotal = () => {
 
 function CircleProgress({ percent, color, size = 90 }) {
   const r = (size - 10) / 2, circ = 2 * Math.PI * r, dash = (percent / 100) * circ;
+  if (loading) {
+    return (
+      <div style={{ minHeight:"100vh", background:"#f0f4f8", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif" }}>
+        <div style={{ fontSize:28, fontWeight:900, background:"linear-gradient(135deg,#db2877,#7c3aed)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent", marginBottom:16 }}>3D Sorter</div>
+        <div style={{ width:40, height:40, border:"4px solid #e2e8f0", borderTop:"4px solid #db2877", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div style={{ marginTop:16, fontSize:13, color:"#64748b" }}>데이터 불러오는 중...</div>
+      </div>
+    );
+  }
+
   return (
     <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={6} />
@@ -63,6 +74,7 @@ function CircleProgress({ percent, color, size = 90 }) {
 }
 
 export default function App() {
+  const [loading, setLoading] = useState(true);
   const [data, setData] = useState(initData);
   const [totalBatches, setTotalBatches] = useState(initTotal);
   const [tempTotal, setTempTotal] = useState(String(initTotal()));
@@ -91,11 +103,11 @@ export default function App() {
     try { localStorage.setItem("sorter3d_editable", "false"); } catch (e) {}
   };
 
-  const saveData = (d) => {
+  const saveData = (d, zone) => {
     if (!editable) return;
     setData(d);
     try { localStorage.setItem("sorter3d_data", JSON.stringify(d)); } catch (e) {}
-    dbSet("sorter3d/data", d);
+    if (zone && d[zone]) { dbSet(`sorter3d/data/${zone}`, d[zone]); } else { dbSet("sorter3d/data", d); }
   };
 
   const saveTotal = (n) => {
@@ -111,6 +123,7 @@ export default function App() {
       if (resettingRef.current) return;
       const v = snap.val();
       if (v) { setData(v); try { localStorage.setItem("sorter3d_data", JSON.stringify(v)); } catch (e) {} }
+      setLoading(false);
     });
     const u2 = onValue(ref(fdb, "sorter3d/total"), snap => {
       const v = snap.val();
@@ -133,7 +146,7 @@ export default function App() {
 
   const handleDoneChange = (zone, val) => {
     const num = val === "" ? "" : Math.min(totalBatches, Math.max(0, parseInt(val) || 0));
-    saveData({ ...data, [zone]: { ...data[zone], done: num } });
+    saveData({ ...data, [zone]: { ...data[zone], done: num } }, zone);
   };
 
   const togglePicking = (zone) => {
@@ -150,7 +163,7 @@ export default function App() {
       setTimeout(() => setZoneResetConfirm(null), 3000);
       return;
     }
-    saveData({ ...data, [z]: { done: "", picking: false } });
+    saveData({ ...data, [z]: { done: "", picking: false } }, z);
     setZoneResetConfirm(null);
   };
 
