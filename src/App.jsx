@@ -146,7 +146,7 @@ export default function App() {
 
   const handleDoneChange = (zone, val) => {
     const num = val === "" ? "" : Math.min(totalBatches, Math.max(0, parseInt(val) || 0));
-    saveData({ ...data, [zone]: { ...data[zone], done: num } }, zone);
+    saveData({ ...data, [zone]: { ...data[zone], done: num } });
   };
 
   const togglePicking = (zone) => {
@@ -163,7 +163,7 @@ export default function App() {
       setTimeout(() => setZoneResetConfirm(null), 3000);
       return;
     }
-    saveData({ ...data, [z]: { done: "", picking: false } }, z);
+    saveData({ ...data, [z]: { done: "", picking: false } });
     setZoneResetConfirm(null);
   };
 
