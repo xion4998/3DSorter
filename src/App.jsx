@@ -16,7 +16,17 @@ const firebaseConfig = {
 const EDIT_PASSWORD = "008";
 let fdb = null;
 try { fdb = getDatabase(initializeApp(firebaseConfig)); } catch (e) {}
-const dbSet = (p, val) => { try { if (fdb) set(ref(fdb, p), val); } catch (e) {} };
+const dbSet = (p, val) => { 
+  try { 
+    if (fdb) {
+      set(ref(fdb, p), val)
+        .then(() => console.log("Firebase write OK:", p))
+        .catch(e => console.error("Firebase write FAIL:", p, e));
+    } else {
+      console.error("fdb is null!");
+    }
+  } catch (e) { console.error("dbSet error:", e); } 
+};
 
 const ZONES = ["상부", "하부", "B", "C", "D", "P/Z", "T", "W", "V"];
 const ZONE_COLORS = {
@@ -91,8 +101,12 @@ export default function App() {
     try { localStorage.setItem("sorter3d_editable", "false"); } catch (e) {}
   };
 
+  const editableRef = useRef(editable);
+  useEffect(() => { editableRef.current = editable; }, [editable]);
+
   const saveData = (d, zone) => {
-    if (!editable) return;
+    const isEditable = editable || (typeof localStorage !== "undefined" && localStorage.getItem("sorter3d_editable") === "true");
+    if (!isEditable) return;
     setData(d);
     try { localStorage.setItem("sorter3d_data", JSON.stringify(d)); } catch (e) {}
     if (zone && d[zone]) { dbSet(`sorter3d/data/${zone}`, d[zone]); } else { dbSet("sorter3d/data", d); }
@@ -180,6 +194,11 @@ export default function App() {
     const total = totalBatches * ZONES.length;
     return { pct: total > 0 ? Math.min(100, Math.round((doneSum / total) * 100)) : 0 };
   }, [data, totalBatches]);
+
+  // data 변경 시 Firebase 자동 동기화
+  useEffect(() => {
+    dbSet("sorter3d/data", data);
+  }, [data]);
 
   useEffect(() => {
     dbSet("summary/3ds", { pct: grand.pct, ts: Date.now() });
