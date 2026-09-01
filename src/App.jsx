@@ -124,7 +124,12 @@ export default function App() {
     const u1 = onValue(ref(fdb, "sorter3d/data"), snap => {
       if (resettingRef.current) return;
       const v = snap.val();
-      if (v) { setData(v); try { localStorage.setItem("sorter3d_data", JSON.stringify(v)); } catch (e) {} }
+      if (v) {
+        const converted = {};
+        Object.keys(v).forEach(k => { converted[k.replace(/_/g, "/")] = v[k]; });
+        setData(converted);
+        try { localStorage.setItem("sorter3d_data", JSON.stringify(converted)); } catch (e) {}
+      }
     });
     const u2 = onValue(ref(fdb, "sorter3d/total"), snap => {
       const v = snap.val();
@@ -197,7 +202,9 @@ export default function App() {
 
   // data 변경 시 Firebase 자동 동기화
   useEffect(() => {
-    dbSet("sorter3d/data", data);
+    const fbData = {};
+    Object.keys(data).forEach(k => { fbData[k.replace(/\//g, "_")] = data[k]; });
+    dbSet("sorter3d/data", fbData);
   }, [data]);
 
   useEffect(() => {
