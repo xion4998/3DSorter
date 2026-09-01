@@ -183,14 +183,14 @@ export default function App() {
   const zoneTotals = useMemo(() => {
     const out = {};
     ZONES.forEach(z => {
-      const done = data[z].done === "" ? 0 : Number(data[z].done);
+      const done = (data[z]||{done:"",picking:false}).done === "" ? 0 : Number((data[z]||{done:"",picking:false}).done);
       out[z] = { done, pct: totalBatches > 0 ? Math.min(100, Math.round((done / totalBatches) * 100)) : 0 };
     });
     return out;
   }, [data, totalBatches]);
 
   const grand = useMemo(() => {
-    const doneSum = ZONES.reduce((s, z) => s + (data[z].done === "" ? 0 : Number(data[z].done)), 0);
+    const doneSum = ZONES.reduce((s, z) => s + ((data[z]||{done:"",picking:false}).done === "" ? 0 : Number((data[z]||{done:"",picking:false}).done)), 0);
     const total = totalBatches * ZONES.length;
     return { pct: total > 0 ? Math.min(100, Math.round((doneSum / total) * 100)) : 0 };
   }, [data, totalBatches]);
@@ -212,7 +212,7 @@ export default function App() {
     const zoneStatus = {};
     ZONES.forEach(z => {
       const { done, pct } = zoneTotals[z];
-      if (data[z].picking) zoneStatus[z] = "완료";
+      if ((data[z]||{done:"",picking:false}).picking) zoneStatus[z] = "완료";
       else if (pct === 100) zoneStatus[z] = "불출완료";
       else if (done > 0) zoneStatus[z] = `${done}배치 불출중`;
       else zoneStatus[z] = "미불출";
@@ -237,7 +237,7 @@ export default function App() {
 
   const S = { bg:"#f0f4f8",card:"#ffffff",border:"#e2e8f0",text:"#0f172a",textSub:"#64748b",inputBg:"#f8fafc",shadow:"0 1px 8px rgba(0,0,0,0.08)",shadowMd:"0 2px 16px rgba(0,0,0,0.10)" };
   const activeColor = ZONE_COLORS[activeZone];
-  const currentDone = data[activeZone].done;
+  const currentDone = (data[activeZone]||{done:"",picking:false}).done;
   const currentPct = currentDone !== "" && totalBatches > 0 ? Math.round((Number(currentDone) / totalBatches) * 100) : null;
 
   return (
@@ -315,7 +315,7 @@ export default function App() {
 
         {/* 피킹완료 버튼 */}
         {(() => {
-          const isPicking = data[activeZone].picking || false;
+          const isPicking = (data[activeZone]||{done:"",picking:false}).picking || false;
           const pct = zoneTotals[activeZone].pct;
           const isBul = pct === 100 && !isPicking;
           return (
@@ -328,7 +328,7 @@ export default function App() {
         {/* 배치 그리드 */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(10,1fr)", gap:4, marginBottom:14 }}>
           {Array.from({ length: totalBatches }, (_, i) => i + 1).map(b => {
-            const done = data[activeZone].done;
+            const done = (data[activeZone]||{done:"",picking:false}).done;
             const completed = done !== "" && b <= Number(done);
             const isAct = activeBatch === b;
             return (
