@@ -104,12 +104,17 @@ export default function App() {
   const editableRef = useRef(editable);
   useEffect(() => { editableRef.current = editable; }, [editable]);
 
-  const saveData = (d, zone) => {
+  const saveData = (d, changedZone) => {
     const isEditable = editable || (typeof localStorage !== "undefined" && localStorage.getItem("sorter3d_editable") === "true");
     if (!isEditable) return;
     setData(d);
     try { localStorage.setItem("sorter3d_data", JSON.stringify(d)); } catch (e) {}
-    if (zone && d[zone]) { dbSet(`sorter3d/data/${zone}`, d[zone]); } else { dbSet("sorter3d/data", d); }
+    if (changedZone && d[changedZone]) {
+      const fbKey = changedZone.replace(/\//g, "_");
+      dbSet(`sorter3d/data/${fbKey}`, d[changedZone]);
+    } else {
+      ZONES.forEach(z => { if (d[z]) { const fbKey = z.replace(/\//g, "_"); dbSet(`sorter3d/data/${fbKey}`, d[z]); } });
+    }
   };
 
   const saveTotal = (n) => {
@@ -153,7 +158,7 @@ export default function App() {
   const selectBatch = (b) => {
     if (!editable) return;
     setActiveBatch(b);
-    saveData({ ...data, [activeZone]: { ...(data[activeZone]||{}), done: b } });
+    saveData({ ...data, [activeZone]: { ...(data[activeZone]||{}), done: b } }, activeZone);
     if (inputPanelRef.current) inputPanelRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
@@ -165,7 +170,7 @@ export default function App() {
   const togglePicking = (zone) => {
     const cur = data[zone];
     const newPicking = !(cur.picking || false);
-    saveData({ ...data, [zone]: { ...cur, picking: newPicking, done: newPicking ? totalBatches : cur.done } });
+    saveData({ ...data, [zone]: { ...cur, picking: newPicking, done: newPicking ? totalBatches : cur.done } }, zone);
   };
 
   const resetZone = (z, e) => {
@@ -185,7 +190,7 @@ export default function App() {
     try { localStorage.removeItem("sorter3d_data"); } catch (e) {}
     const d = initData();
     resettingRef.current = true;
-    dbSet("sorter3d/data", d);
+    ZONES.forEach(z => { if (d[z]) { const fbKey = z.replace(/\//g, "_"); dbSet(`sorter3d/data/${fbKey}`, d[z]); } });
     setData(d);
     try { localStorage.setItem("sorter3d_data", JSON.stringify(d)); } catch (e) {}
     setResetConfirm(false);
