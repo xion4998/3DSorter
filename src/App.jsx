@@ -107,9 +107,9 @@ export default function App() {
     try { localStorage.setItem("sorter3d_data", JSON.stringify(d)); } catch (e) {}
     if (changedZone && d[changedZone]) {
       const fbKey = changedZone.split("/").join("_");
-      dbSet(`sorter3d/data/${fbKey}`, d[changedZone]);
+      dbSet("sorter3d/data/" + fbKey, d[changedZone]);
     } else {
-      ZONES.forEach(z => { if (d[z]) { const fbKey = z.split("/").join("_"); dbSet(`sorter3d/data/${fbKey}`, d[z]); } });
+      ZONES.forEach(z => { if (d[z]) { const fbKey = z.split("/").join("_"); dbSet("sorter3d/data/" + fbKey, d[z]); } });
     }
   };
 
@@ -126,7 +126,7 @@ export default function App() {
     if (!fdb) return;
     ZONES.forEach(z => {
       const fbKey = z.split("/").join("_");
-      subs.push(onValue(ref(fdb, `sorter3d/data/${fbKey}`), snap => {
+      subs.push(onValue(ref(fdb, "sorter3d/data/" + fbKey), snap => {
         if (resettingRef.current) return;
         const v = snap.val();
         if (v) {
@@ -186,7 +186,7 @@ export default function App() {
     try { localStorage.removeItem("sorter3d_data"); } catch (e) {}
     const d = initData();
     resettingRef.current = true;
-    ZONES.forEach(z => { if (d[z]) { const fbKey = z.split("/").join("_"); dbSet(`sorter3d/data/${fbKey}`, d[z]); } });
+    ZONES.forEach(z => { if (d[z]) { const fbKey = z.split("/").join("_"); dbSet("sorter3d/data/" + fbKey, d[z]); } });
     setData(d);
     try { localStorage.setItem("sorter3d_data", JSON.stringify(d)); } catch (e) {}
     setResetConfirm(false);
