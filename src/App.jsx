@@ -119,17 +119,24 @@ export default function App() {
     dbSet("sorter3d/total", n);
   };
 
+  const isWritingRef = useRef(false);
+
   useEffect(() => {
     if (!fdb) return;
-    const u1 = onValue(ref(fdb, "sorter3d/data"), snap => {
-      if (resettingRef.current) return;
-      const v = snap.val();
-      if (v) {
-        const converted = {};
-        Object.keys(v).forEach(k => { converted[k.replace(/_/g, "/")] = v[k]; });
-        setData(converted);
-        try { localStorage.setItem("sorter3d_data", JSON.stringify(converted)); } catch (e) {}
-      }
+    ZONES.forEach(z => {
+      const fbKey = z.replace(/\//g, "_");
+      subs.push(onValue(ref(fdb, `sorter3d/data/${fbKey}`), snap => {
+        if (resettingRef.current) return;
+        const v = snap.val();
+        if (v) {
+          isWritingRef.current = true;
+          setData(prev => {
+            const next = { ...prev, [z]: v };
+            try { localStorage.setItem("sorter3d_data", JSON.stringify(next)); } catch (e) {}
+            return next;
+          });
+        }
+      }));
     });
     const u2 = onValue(ref(fdb, "sorter3d/total"), snap => {
       const v = snap.val();
@@ -146,13 +153,13 @@ export default function App() {
   const selectBatch = (b) => {
     if (!editable) return;
     setActiveBatch(b);
-    saveData({ ...data, [activeZone]: { ...data[activeZone], done: b } });
+    saveData({ ...data, [activeZone]: { ...(data[activeZone]||{}), done: b } });
     if (inputPanelRef.current) inputPanelRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   const handleDoneChange = (zone, val) => {
     const num = val === "" ? "" : Math.min(totalBatches, Math.max(0, parseInt(val) || 0));
-    saveData({ ...data, [zone]: { ...data[zone], done: num } });
+    saveData({ ...data, [zone]: { ...(data[zone]||{}), done: num } }, zone);
   };
 
   const togglePicking = (zone) => {
@@ -169,7 +176,7 @@ export default function App() {
       setTimeout(() => setZoneResetConfirm(null), 3000);
       return;
     }
-    saveData({ ...data, [z]: { done: "", picking: false } });
+    saveData({ ...data, [z]: { done: "", picking: false } }, z);
     setZoneResetConfirm(null);
   };
 
@@ -188,7 +195,8 @@ export default function App() {
   const zoneTotals = useMemo(() => {
     const out = {};
     ZONES.forEach(z => {
-      const done = (data[z]||{done:"",picking:false}).done === "" ? 0 : Number((data[z]||{done:"",picking:false}).done);
+      const rawDone = ((data[z]||{done:"",picking:false})||{}).done;
+      const done = (rawDone === "" || rawDone === undefined || rawDone === null) ? 0 : (Number(rawDone)||0);
       out[z] = { done, pct: totalBatches > 0 ? Math.min(100, Math.round((done / totalBatches) * 100)) : 0 };
     });
     return out;
@@ -200,12 +208,7 @@ export default function App() {
     return { pct: total > 0 ? Math.min(100, Math.round((doneSum / total) * 100)) : 0 };
   }, [data, totalBatches]);
 
-  // data 변경 시 Firebase 자동 동기화
-  useEffect(() => {
-    const fbData = {};
-    Object.keys(data).forEach(k => { fbData[k.replace(/\//g, "_")] = data[k]; });
-    dbSet("sorter3d/data", fbData);
-  }, [data]);
+
 
   useEffect(() => {
     dbSet("summary/3ds", { pct: grand.pct, ts: Date.now() });
