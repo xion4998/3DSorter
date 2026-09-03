@@ -124,6 +124,7 @@ export default function App() {
 
   useEffect(() => {
     if (!fdb) return;
+    const subs = [];
     ZONES.forEach(z => {
       const fbKey = z.split("/").join("_");
       subs.push(onValue(ref(fdb, "sorter3d/data/" + fbKey), snap => {
@@ -143,7 +144,8 @@ export default function App() {
       const v = snap.val();
       if (v) { setTotalBatches(v); setTempTotal(String(v)); }
     });
-    return () => { u1(); u2(); };
+    subs.push(u2);
+    return () => subs.forEach(u => u());
   }, []);
 
   const applyTotal = () => {
